@@ -1,6 +1,6 @@
 # PTO Viewer
 
-A tool for seeing how much PTO you're taking relative to everyone else, as a way to encourage taking more PTO.
+A tool for seeing how much PTO you're taking relative to everyone else, as a way to encourage taking more PTO. Add your PTO here https://pto-viewer.firebaseapp.com/. By default you're name is `Anonymous`, but you can optionally set your name.
 
 ### Development
 - Clone this repo
@@ -9,6 +9,13 @@ A tool for seeing how much PTO you're taking relative to everyone else, as a way
 - Run `npx firebase login` (if you haven't before)
 - Run `yarn dev`
 
- d
 ### Build
 - Run `yarn build`
+
+
+### Future Plans (in no particular order)
+- [ ] Select a year to view
+- [ ] Add a button to refresh the data manually
+- [ ] Easier way of subtracting days if you've added too many. A negative number isn't very user friendly :)
+- [ ] Add ToS
+- [ ] Add Privacy Policy
