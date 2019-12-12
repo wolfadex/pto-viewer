@@ -68,3 +68,7 @@ firebaseConfig.json
 
 # Parcel cache directory
 .cache
+
+# Ignore generated build files
+public/*
+!public/404.html

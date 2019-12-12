@@ -1,0 +1,25 @@
+{
+  "name": "pro-viewer-web",
+  "author": {
+    "name": "Wolfgang Schuster"
+  },
+  "scripts": {
+    "dev": "parcel src/index.html --out-dir=public",
+    "build": "yarn build:code && yarn build:upload",
+    "build:code": "parcel build src/index.html --out-dir=public",
+    "build:upload": "firebase deploy"
+  },
+  "devDependencies": {
+    "elm-analyse": "^0.16.5",
+    "elm-format": "^0.8.2",
+    "elm-hot": "^1.1.4",
+    "firebase-tools": "^7.10.0",
+    "node-elm-compiler": "^5.0.4",
+    "parcel-bundler": "^1.12.4",
+    "prettier": "^1.19.1"
+  },
+  "dependencies": {
+    "firebase": "^7.5.2",
+    "firebaseui": "^4.3.0"
+  }
+}
