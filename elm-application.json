@@ -1,0 +1,11 @@
+{
+  "name": "wolfadex/pto-viewer",
+  "summary": "App for comparing PTO days in a year.",
+  "version": "1.0.0",
+  "exposed-modules": [
+    "Ui",
+    "Ui.Color",
+    "Ui.Icon",
+    "Main"
+  ]
+}

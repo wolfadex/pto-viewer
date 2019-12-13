@@ -1,4 +1,15 @@
-port module Main exposing (main)
+port module Main exposing
+    ( main
+    , Pto
+    )
+
+{-| An app for comparing PTO within a year, as a means for encouraging people to use their PTO. Especially when you're at a company that has unlimited PTO.
+
+@docs main
+
+@docs Pto
+
+-}
 
 import Browser exposing (Document)
 import Dict exposing (Dict)
@@ -14,8 +25,10 @@ import Json.Decode exposing (Decoder)
 import Json.Encode exposing (Value)
 import Ui
 import Ui.Color as Color
+import Ui.Icon as Icon
 
 
+{-| -}
 main : Program Int Model Msg
 main =
     Browser.document
@@ -31,7 +44,7 @@ main =
 
 
 type Model
-    = Unauthenticated Int
+    = Unauthenticated Year
     | Authenticated AuthModel
 
 
@@ -40,7 +53,8 @@ type alias AuthModel =
     , allPto : Request (Dict Id Pto) String
     , addPto : Maybe Int
     , displayNameForm : Maybe String
-    , currentYear : Int
+    , currentYear : Year
+    , showSettings : Bool
     }
 
 
@@ -70,10 +84,29 @@ type alias Id =
     String
 
 
+{-| Example
+
+    { name = Nothing
+    , years =
+        Dict.fromList
+            [ ( 2018, 17 )
+            , ( 2019, 5 )
+            ]
+    }
+
+-}
 type alias Pto =
     { name : Maybe String
-    , years : Dict Int Int
+    , years : Dict Year Day
     }
+
+
+type alias Year =
+    Int
+
+
+type alias Day =
+    Int
 
 
 decodeAllPto : Decoder (Dict Id Pto)
@@ -88,7 +121,7 @@ decodePto =
         (Json.Decode.field "years" decodePtoYears)
 
 
-decodePtoYears : Decoder (Dict Int Int)
+decodePtoYears : Decoder (Dict Year Day)
 decodePtoYears =
     Json.Decode.dict decodeYear
         |> Json.Decode.andThen
@@ -128,6 +161,8 @@ type Msg
     | SetName String
     | SubmitName
     | RemoveName
+    | ShowSettings
+    | HideSettings
 
 
 
@@ -214,152 +249,127 @@ port removeName : Id -> Cmd msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    case model of
+        Unauthenticated data ->
+            updateUnauthenticated msg data model
+
+        Authenticated data ->
+            updateAuthenticated msg data model
+
+
+updateUnauthenticated : Msg -> Year -> Model -> ( Model, Cmd Msg )
+updateUnauthenticated msg currentYear model =
     case msg of
-        NoOp ->
+        --  Auth
+        LoggedIn user ->
+            ( Authenticated
+                { user = user
+                , allPto = Loading
+                , addPto = Nothing
+                , displayNameForm = Nothing
+                , currentYear = currentYear
+                , showSettings = False
+                }
+            , getPto ()
+            )
+
+        -- ALL OTHER
+        _ ->
             ( model, Cmd.none )
 
-        -- AUTH
+
+updateAuthenticated : Msg -> AuthModel -> Model -> ( Model, Cmd Msg )
+updateAuthenticated msg authModel model =
+    case msg of
+        -- Auth
         LoggedOut ->
-            case model of
-                Authenticated { currentYear } ->
-                    ( Unauthenticated currentYear, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
-
-        LoggedIn user ->
-            case model of
-                Unauthenticated currentYear ->
-                    ( Authenticated { user = user, allPto = Loading, addPto = Nothing, displayNameForm = Nothing, currentYear = currentYear }, getPto () )
-
-                Authenticated _ ->
-                    ( model, Cmd.none )
+            ( Unauthenticated authModel.currentYear, Cmd.none )
 
         Logout ->
             ( model, logout () )
 
+        -- SETTINGS
+        ShowSettings ->
+            ( Authenticated { authModel | showSettings = True }, Cmd.none )
+
+        HideSettings ->
+            ( Authenticated { authModel | showSettings = False }, Cmd.none )
+
         -- DISPLAY NAME
         ShowNameForm ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated
-                        { data
-                            | displayNameForm =
-                                Just <|
-                                    case data.allPto of
-                                        Success pto ->
-                                            case Dict.get data.user.id pto of
-                                                Nothing ->
-                                                    ""
-
-                                                Just { name } ->
-                                                    Maybe.withDefault "" name
-
-                                        _ ->
+            ( Authenticated
+                { authModel
+                    | displayNameForm =
+                        Just <|
+                            case authModel.allPto of
+                                Success pto ->
+                                    case Dict.get authModel.user.id pto of
+                                        Nothing ->
                                             ""
-                        }
-                    , Cmd.none
-                    )
 
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+                                        Just { name } ->
+                                            Maybe.withDefault "" name
+
+                                _ ->
+                                    ""
+                }
+            , Cmd.none
+            )
 
         HideNameForm ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | displayNameForm = Nothing }, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( Authenticated { authModel | displayNameForm = Nothing }, Cmd.none )
 
         SetName name ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | displayNameForm = Just name }, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( Authenticated { authModel | displayNameForm = Just name }, Cmd.none )
 
         SubmitName ->
-            case model of
-                Authenticated data ->
-                    case data.displayNameForm of
-                        Just name ->
-                            ( Authenticated { data | displayNameForm = Nothing }, setName ( data.user.id, name ) )
+            case authModel.displayNameForm of
+                Just name ->
+                    ( Authenticated { authModel | displayNameForm = Nothing }, setName ( authModel.user.id, name ) )
 
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                Unauthenticated _ ->
+                Nothing ->
                     ( model, Cmd.none )
 
         RemoveName ->
-            case model of
-                Authenticated data ->
-                    ( model, removeName data.user.id )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( model, removeName authModel.user.id )
 
         -- PTO CRUD
         ShowAddPtoForm ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | addPto = Just 1 }, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( Authenticated { authModel | addPto = Just 1 }, Cmd.none )
 
         HideAddPtoForm ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | addPto = Nothing }, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( Authenticated { authModel | addPto = Nothing }, Cmd.none )
 
         SetAddPtoDays days ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | addPto = Just days }, Cmd.none )
-
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+            ( Authenticated { authModel | addPto = Just days }, Cmd.none )
 
         SubmitPto ->
-            case model of
-                Authenticated data ->
-                    case data.addPto of
-                        Just days ->
-                            ( Authenticated { data | addPto = Nothing }
-                            , case encodeMyPto data days of
-                                Nothing ->
-                                    Cmd.none
-
-                                Just encodedYears ->
-                                    updatePto ( data.user.id, encodedYears )
-                            )
-
+            case authModel.addPto of
+                Just days ->
+                    ( Authenticated { authModel | addPto = Nothing }
+                    , case encodeMyPto authModel days of
                         Nothing ->
-                            ( model, Cmd.none )
+                            Cmd.none
 
-                Unauthenticated _ ->
+                        Just encodedYears ->
+                            updatePto ( authModel.user.id, encodedYears )
+                    )
+
+                Nothing ->
                     ( model, Cmd.none )
 
         SetPto pto ->
-            case model of
-                Authenticated data ->
-                    ( Authenticated { data | allPto = Success pto }
-                    , case Dict.get data.user.id pto of
-                        Just _ ->
-                            Cmd.none
+            ( Authenticated { authModel | allPto = Success pto }
+            , case Dict.get authModel.user.id pto of
+                Just _ ->
+                    Cmd.none
 
-                        Nothing ->
-                            createSelf data.user.id
-                    )
+                Nothing ->
+                    createSelf authModel.user.id
+            )
 
-                Unauthenticated _ ->
-                    ( model, Cmd.none )
+        _ ->
+            ( model, Cmd.none )
 
 
 encodeMyPto : AuthModel -> Int -> Maybe Value
@@ -415,6 +425,12 @@ view model =
 
                             Just n ->
                                 viewAddPto n
+                    , Element.inFront <|
+                        if data.showSettings then
+                            viewSettings data
+
+                        else
+                            Element.none
                     , Element.inFront <|
                         case data.displayNameForm of
                             Nothing ->
@@ -472,26 +488,14 @@ viewAuthenticated ({ user, allPto, currentYear } as authModel) =
     Element.column
         [ Element.centerX
         , Element.width (Element.fill |> Element.maximum 800)
+        , Element.height Element.fill
         , Element.spacing 16
         ]
-        [ Element.row
-            [ Element.spacing 16
-            , Element.alignRight
+        [ Element.column
+            [ Element.width Element.fill
+            , Element.height Element.fill
+            , Element.scrollbarY
             ]
-            [ viewUser authModel
-            , Ui.button
-                [ Background.color Color.secondary2 ]
-                { onPress = Just Logout
-                , label = Element.text "Logout"
-                }
-            ]
-        , Ui.button
-            []
-            { onPress = Just ShowAddPtoForm
-            , label = Element.text "Add PTO"
-            }
-        , Element.column
-            [ Element.width Element.fill ]
             (case allPto of
                 NotYetAsked ->
                     [ Element.none ]
@@ -562,6 +566,7 @@ viewAuthenticated ({ user, allPto, currentYear } as authModel) =
                         (Element.text <| "Failed to load PTO: " ++ error)
                     ]
             )
+        , viewSettingsBar
         ]
 
 
@@ -678,41 +683,104 @@ viewNameForm name =
             ]
 
 
-viewUser : AuthModel -> Element Msg
-viewUser { user, allPto } =
+viewSettingsBar : Element Msg
+viewSettingsBar =
+    Element.row
+        [ Element.spacing 16
+        , Element.padding 8
+        , Element.width Element.fill
+        , Border.solid
+        , Border.widthEach
+            { bottom = 0
+            , top = 1
+            , left = 0
+            , right = 0
+            }
+        ]
+        [ Ui.button
+            []
+            { onPress = Just ShowAddPtoForm
+            , label = Element.text "Add PTO"
+            }
+        , Ui.button
+            [ Background.color Color.white
+            , Element.alignRight
+            ]
+            { onPress = Just ShowSettings
+            , label = Icon.hamburger
+            }
+        ]
+
+
+viewSettings : AuthModel -> Element Msg
+viewSettings { user, allPto } =
     let
-        setDisplayNameEl =
-            Element.row
-                [ Element.spacing 16 ]
-                [ Ui.button
-                    []
-                    { onPress = Just ShowNameForm
-                    , label = Element.text "Set Name"
-                    }
+        displayName =
+            case allPto of
+                Success pto ->
+                    getDisplayName user.id pto
+
+                _ ->
+                    Nothing
+    in
+    Ui.modal <|
+        Element.column
+            [ Element.spacing 16
+            , Element.padding 8
+            ]
+            [ Element.paragraph
+                []
+                [ label "Logged In As"
                 , Element.text user.name
                 ]
-    in
-    case allPto of
-        Success pto ->
-            case Dict.get user.id pto of
-                Just { name } ->
-                    case name of
-                        Just displayName ->
-                            Element.row
-                                [ Element.spacing 16 ]
-                                [ Ui.button
-                                    []
-                                    { onPress = Just RemoveName
-                                    , label = Element.text "Remove Name"
-                                    }
-                                , Element.text (user.name ++ " aka " ++ displayName)
-                                ]
-
-                        Nothing ->
-                            setDisplayNameEl
+            , Element.paragraph
+                []
+                [ label "Email"
+                , Element.text user.email
+                ]
+            , Element.paragraph
+                []
+                [ label "Display Name"
+                , Element.text <| Maybe.withDefault "Anonymous" displayName
+                ]
+            , case displayName of
+                Just _ ->
+                    Ui.button
+                        []
+                        { onPress = Just RemoveName
+                        , label = Element.text "Remove Display Name"
+                        }
 
                 Nothing ->
-                    setDisplayNameEl
+                    Ui.button
+                        []
+                        { onPress = Just ShowNameForm
+                        , label = Element.text "Set Display Name"
+                        }
+            , Element.el [ Element.height (Element.px 32) ] Element.none
+            , Element.row
+                [ Element.width Element.fill ]
+                [ Ui.button
+                    [ Background.color Color.complement ]
+                    { onPress = Just HideSettings
+                    , label = Element.text "Cancel"
+                    }
+                , Ui.button
+                    [ Background.color Color.secondary2
+                    , Element.alignRight
+                    ]
+                    { onPress = Just Logout
+                    , label = Element.text "Logout"
+                    }
+                ]
+            ]
 
-        _ ->
-            setDisplayNameEl
+
+getDisplayName : Id -> Dict Id Pto -> Maybe String
+getDisplayName selfId =
+    Dict.get selfId >> Maybe.andThen (\{ name } -> name)
+
+
+label : String -> Element msg
+label str =
+    Element.el [ Font.bold ] (Element.text (str ++ ": "))
