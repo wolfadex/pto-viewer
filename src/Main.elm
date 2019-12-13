@@ -793,18 +793,43 @@ viewSettings { user, allPto } =
                         { onPress = Just ShowNameForm
                         , label = Element.text "Set Display Name"
                         }
+            , Element.el
+                [ Border.solid
+                , Border.widthEach
+                    { left = 0
+                    , right = 0
+                    , top = 1
+                    , bottom = 0
+                    }
+                , Element.width Element.fill
+                ]
+                Element.none
+            , Element.newTabLink
+                [ Font.color Color.linkBlue ]
+                { url = "https://github.com/wolfadex/pto-viewer"
+                , label =
+                    Element.row
+                        []
+                        [ Element.image
+                            [ Element.height (Element.px 28) ]
+                            { src = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+                            , description = "GitHub logo"
+                            }
+                        , Element.text "GitHub repo"
+                        ]
+                }
             , Element.row
                 [ Element.width Element.fill ]
                 [ Element.newTabLink
                     [ Font.size 12
-                    , Font.color <| Element.rgb 0 0 0.8
+                    , Font.color Color.linkBlue
                     ]
                     { url = "/tos.html"
                     , label = Element.text "Terms of Service"
                     }
                 , Element.newTabLink
                     [ Font.size 12
-                    , Font.color <| Element.rgb 0 0 0.8
+                    , Font.color Color.linkBlue
                     , Element.alignRight
                     ]
                     { url = "/privacypolicy.html"

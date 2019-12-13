@@ -4,6 +4,7 @@ module Ui.Color exposing
     , secondary2
     , complement
     , white
+    , linkBlue
     )
 
 {-| The color palette of the app. Colors are based off of this palette <https://paletton.com/#uid=6550T0kbnGvapVrbnOV9Xwsc4o0>.
@@ -13,6 +14,7 @@ module Ui.Color exposing
 @docs secondary2
 @docs complement
 @docs white
+@docs linkBlue
 
 -}
 
@@ -52,3 +54,10 @@ complement =
 white : Color
 white =
     Element.rgb 1 1 1
+
+
+{-| The same blue as a standard HTML link
+-}
+linkBlue : Color
+linkBlue =
+    Element.rgb 0 0 0.8
