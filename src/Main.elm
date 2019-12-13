@@ -163,6 +163,7 @@ type Msg
     | RemoveName
     | ShowSettings
     | HideSettings
+    | RefreshData
 
 
 
@@ -334,6 +335,9 @@ updateAuthenticated msg authModel model =
             ( model, removeName authModel.user.id )
 
         -- PTO CRUD
+        RefreshData ->
+            ( Authenticated { authModel | allPto = Loading }, getPto () )
+
         ShowAddPtoForm ->
             ( Authenticated { authModel | addPto = Just 1 }, Cmd.none )
 
@@ -523,7 +527,15 @@ viewAuthenticated ({ user, allPto, currentYear } as authModel) =
                                 [ Element.width Element.fill
                                 , Element.spacing 16
                                 ]
-                                [ Element.text ("Year: " ++ String.fromInt currentYear)
+                                [ Element.row
+                                    [ Element.width Element.fill ]
+                                    [ Element.text ("Year: " ++ String.fromInt currentYear)
+                                    , Ui.button
+                                        [ Element.alignRight ]
+                                        { onPress = Just RefreshData
+                                        , label = Element.text "Refresh"
+                                        }
+                                    ]
                                 , Element.row
                                     [ Element.centerX
                                     ]
