@@ -21,5 +21,5 @@ A tool for seeing how much PTO you're taking relative to everyone else, as a way
 - [ ] Select a year to view
 - [x] Add a button to refresh the data manually
 - [ ] Easier way of subtracting days if you've added too many. A negative number isn't very user friendly :)
-- [ ] Add ToS
-- [ ] Add Privacy Policy
+- [x] Add ToS
+- [x] Add Privacy Policy

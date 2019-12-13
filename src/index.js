@@ -35,16 +35,16 @@ customElements.define(
           firebase.auth.EmailAuthProvider.PROVIDER_ID,
           firebase.auth.GoogleAuthProvider.PROVIDER_ID,
         ],
-        tosUrl: "TODO",
-        privacyPolicyUrl: "TODO",
+        tosUrl: "/tos.html",
+        privacyPolicyUrl: "/privacypolicy.html",
       });
     }
   },
 );
 
-const app = Elm.Main.init({ 
+const app = Elm.Main.init({
   node: document.getElementById("elm-root"),
-  flags: (new Date()).getFullYear()
+  flags: new Date().getFullYear(),
 });
 
 // AUTH
@@ -64,7 +64,9 @@ firebase.auth().onAuthStateChanged(function(user) {
 // DATABASE
 
 app.ports.createSelf.subscribe(function(uid) {
-  db.collection("pto").doc(uid).set({ years: { 2019: { days: 0 } } });
+  db.collection("pto")
+    .doc(uid)
+    .set({ years: { 2019: { days: 0 } } });
 });
 
 app.ports.getPto.subscribe(function() {
@@ -72,8 +74,7 @@ app.ports.getPto.subscribe(function() {
 });
 
 app.ports.updatePto.subscribe(function([uid, years]) {
-  db
-    .collection("pto")
+  db.collection("pto")
     .doc(uid)
     .update({
       years,
@@ -84,44 +85,41 @@ app.ports.updatePto.subscribe(function([uid, years]) {
 });
 
 app.ports.setName.subscribe(function([uid, name]) {
-  db
-    .collection("pto")
+  db.collection("pto")
     .doc(uid)
     .update({
       name,
     })
-    .then(function() { 
-      getPto(); 
+    .then(function() {
+      getPto();
     });
 });
 
 app.ports.removeName.subscribe(function(uid) {
-  db
-    .collection("pto")
+  db.collection("pto")
     .doc(uid)
     .update({
       name: null,
     })
     .then(function() {
-      getPto(); 
+      getPto();
     });
 });
 
 function getPto() {
-  db
-    .collection("pto")
+  db.collection("pto")
     .get()
     .then(function(querySnapshot) {
-        const data = {};
-        console.log("carl", 0)
-        querySnapshot.forEach(function(doc) {
-          data[doc.id] = doc.data();
-        });
-        app.ports.setPto.send(data);
-      })
-      .catch(function(error) {
-        console.log("carl", 1, error)
-        // TODO:
-        // app.ports.ptoGetError.send(error);
+      const data = {};
+      console.log("carl", 0);
+      querySnapshot.forEach(function(doc) {
+        data[doc.id] = doc.data();
       });
+      app.ports.setPto.send(data);
+    })
+    .catch(function(error) {
+      console.log("carl", 1, error);
+      // TODO:
+      // app.ports.ptoGetError.send(error);
+    });
 }

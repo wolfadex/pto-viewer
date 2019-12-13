@@ -21,6 +21,7 @@ import Element.Input as Input
 import Element.Keyed as Keyed
 import Element.Region as Region
 import Html
+import Html.Attributes
 import Json.Decode exposing (Decoder)
 import Json.Encode exposing (Value)
 import Ui
@@ -345,7 +346,13 @@ updateAuthenticated msg authModel model =
             ( Authenticated { authModel | addPto = Nothing }, Cmd.none )
 
         SetAddPtoDays days ->
-            ( Authenticated { authModel | addPto = Just days }, Cmd.none )
+            let
+                maxDays =
+                    maxDaysInYear authModel.currentYear
+            in
+            ( Authenticated { authModel | addPto = Just (days |> min maxDays |> max -maxDays) }
+            , Cmd.none
+            )
 
         SubmitPto ->
             case authModel.addPto of
@@ -382,15 +389,30 @@ encodeMyPto { user, allPto, currentYear } days =
         Success pto ->
             Just <|
                 Json.Encode.object <|
+                    let
+                        maxDays =
+                            maxDaysInYear currentYear
+                    in
                     case Dict.get user.id pto of
                         Just { years } ->
                             years
-                                |> Dict.update currentYear (\d -> Just <| Maybe.withDefault 0 d + days)
+                                |> Dict.update
+                                    currentYear
+                                    (\d ->
+                                        Maybe.withDefault 0 d
+                                            + days
+                                            |> max 0
+                                            |> min maxDays
+                                            |> Just
+                                    )
                                 |> Dict.toList
-                                |> List.map (\( y, d ) -> ( String.fromInt y, Json.Encode.object [ ( "days", Json.Encode.int d ) ] ))
+                                |> List.map
+                                    (\( y, d ) ->
+                                        ( String.fromInt y, Json.Encode.object [ ( "days", Json.Encode.int d ) ] )
+                                    )
 
                         Nothing ->
-                            [ ( String.fromInt currentYear, Json.Encode.object [ ( "days", Json.Encode.int days ) ] ) ]
+                            [ ( String.fromInt currentYear, Json.Encode.object [ ( "days", Json.Encode.int (days |> max 0 |> min maxDays) ) ] ) ]
 
         _ ->
             Nothing
@@ -482,7 +504,9 @@ viewUnauthenticated =
             , Element.text " share your name if you want."
             ]
         , Element.el
-            [ Element.centerX ]
+            [ Element.centerX
+            , Element.width Element.fill
+            ]
             (Element.html <| Html.node "firebase-auth" [] [])
         ]
 
@@ -769,6 +793,24 @@ viewSettings { user, allPto } =
                         { onPress = Just ShowNameForm
                         , label = Element.text "Set Display Name"
                         }
+            , Element.row
+                [ Element.width Element.fill ]
+                [ Element.newTabLink
+                    [ Font.size 12
+                    , Font.color <| Element.rgb 0 0 0.8
+                    ]
+                    { url = "/tos.html"
+                    , label = Element.text "Terms of Service"
+                    }
+                , Element.newTabLink
+                    [ Font.size 12
+                    , Font.color <| Element.rgb 0 0 0.8
+                    , Element.alignRight
+                    ]
+                    { url = "/privacypolicy.html"
+                    , label = Element.text "Privacy Policy"
+                    }
+                ]
             , Element.el [ Element.height (Element.px 32) ] Element.none
             , Element.row
                 [ Element.width Element.fill ]
@@ -796,3 +838,20 @@ getDisplayName selfId =
 label : String -> Element msg
 label str =
     Element.el [ Font.bold ] (Element.text (str ++ ": "))
+
+
+maxDaysInYear : Year -> Int
+maxDaysInYear year =
+    if modBy 4 year == 0 then
+        if modBy 100 year == 0 then
+            if modBy 400 year == 0 then
+                366
+
+            else
+                365
+
+        else
+            366
+
+    else
+        365

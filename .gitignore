@@ -72,3 +72,5 @@ firebaseConfig.json
 # Ignore generated build files
 public/*
 !public/404.html
+!public/privacypolicy.html
+!public/tos.html

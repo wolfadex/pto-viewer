@@ -6,10 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- None
+- Tos and Privacy Policy
+- Link to this CHANGELOG
+- Link to GitHub repo
 
 ### Changed
-- None
+- Can't set total days to a negative value
+- Can't add or remove more days than in the year
+- Can't set total days to more days than in the year
 
 ### Removed
 - None
