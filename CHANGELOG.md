@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tos and Privacy Policy
 - Link to this CHANGELOG
 - Link to GitHub repo
+- Minimal stats
 
 ### Changed
 - Can't set total days to a negative value

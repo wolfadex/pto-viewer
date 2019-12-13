@@ -21,7 +21,6 @@ import Element.Input as Input
 import Element.Keyed as Keyed
 import Element.Region as Region
 import Html
-import Html.Attributes
 import Json.Decode exposing (Decoder)
 import Json.Encode exposing (Value)
 import Ui
@@ -56,6 +55,7 @@ type alias AuthModel =
     , displayNameForm : Maybe String
     , currentYear : Year
     , showSettings : Bool
+    , showStats : Bool
     }
 
 
@@ -165,6 +165,8 @@ type Msg
     | ShowSettings
     | HideSettings
     | RefreshData
+    | ShowStats
+    | HideStats
 
 
 
@@ -271,6 +273,7 @@ updateUnauthenticated msg currentYear model =
                 , displayNameForm = Nothing
                 , currentYear = currentYear
                 , showSettings = False
+                , showStats = False
                 }
             , getPto ()
             )
@@ -379,6 +382,12 @@ updateAuthenticated msg authModel model =
                     createSelf authModel.user.id
             )
 
+        ShowStats ->
+            ( Authenticated { authModel | showStats = True }, Cmd.none )
+
+        HideStats ->
+            ( Authenticated { authModel | showStats = False }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
@@ -444,6 +453,12 @@ view model =
                     [ Element.width Element.fill
                     , Element.height Element.fill
                     , Element.padding 16
+                    , Element.inFront <|
+                        if data.showStats then
+                            viewStats data
+
+                        else
+                            Element.none
                     , Element.inFront <|
                         case data.addPto of
                             Nothing ->
@@ -512,7 +527,7 @@ viewUnauthenticated =
 
 
 viewAuthenticated : AuthModel -> Element Msg
-viewAuthenticated ({ user, allPto, currentYear } as authModel) =
+viewAuthenticated { user, allPto, currentYear } =
     Element.column
         [ Element.centerX
         , Element.width (Element.fill |> Element.maximum 800)
@@ -674,7 +689,7 @@ viewAddPto days =
                 []
                 { onChange = SetAddPtoDays
                 , value = days
-                , label = Input.labelAbove [] <| Element.text "Days of PTO you're taking"
+                , label = Input.labelAbove [] <| Element.paragraph [] [ Element.text "Days of PTO (vacation, sick, etc) to add:" ]
                 }
             , Element.row
                 [ Element.spacing 16 ]
@@ -736,7 +751,12 @@ viewSettingsBar =
         [ Ui.button
             []
             { onPress = Just ShowAddPtoForm
-            , label = Element.text "Add PTO"
+            , label = Element.text "PTO"
+            }
+        , Ui.button
+            []
+            { onPress = Just ShowStats
+            , label = Element.text "Stats"
             }
         , Ui.button
             [ Background.color Color.white
@@ -880,3 +900,102 @@ maxDaysInYear year =
 
     else
         365
+
+
+viewStats : AuthModel -> Element Msg
+viewStats { allPto, currentYear, user } =
+    let
+        ( listOfDays, yourPto ) =
+            case allPto of
+                Success pto ->
+                    ( pto
+                        |> Dict.toList
+                        |> List.map (Tuple.second >> .years >> Dict.get currentYear >> Maybe.withDefault 0)
+                    , pto
+                        |> Dict.get user.id
+                        |> Maybe.map (.years >> Dict.get currentYear >> Maybe.withDefault 0)
+                        |> Maybe.withDefault 0
+                    )
+
+                _ ->
+                    ( [], 0 )
+    in
+    Element.column
+        [ Element.width Element.fill
+        , Element.height Element.fill
+        , Background.color Color.white
+        , Element.padding 16
+        , Element.spacing 16
+        ]
+        [ Element.column
+            [ Element.spacing 16
+            , Element.height Element.fill
+            ]
+            [ Element.paragraph
+                [ Border.solid
+                , Border.widthEach
+                    { bottom = 1
+                    , top = 0
+                    , left = 0
+                    , right = 0
+                    }
+                ]
+                [ label "Your PTO"
+                , yourPto
+                    |> String.fromInt
+                    |> addDays
+                    |> Element.text
+                ]
+            , Element.paragraph
+                []
+                [ label "Mean"
+                , (List.sum listOfDays // List.length listOfDays)
+                    |> String.fromInt
+                    |> addDays
+                    |> Element.text
+                ]
+            , Element.paragraph
+                []
+                [ label "Median"
+                , listOfDays
+                    |> List.sort
+                    |> List.drop (List.length listOfDays // 2)
+                    |> List.head
+                    |> Maybe.withDefault 0
+                    |> String.fromInt
+                    |> addDays
+                    |> Element.text
+                ]
+            , Element.paragraph
+                []
+                [ label "Range"
+                , let
+                    largest =
+                        listOfDays
+                            |> List.maximum
+                            |> Maybe.withDefault 0
+
+                    smallest =
+                        listOfDays
+                            |> List.minimum
+                            |> Maybe.withDefault 0
+                  in
+                  (largest - smallest)
+                    |> String.fromInt
+                    |> addDays
+                    |> Element.text
+                ]
+            ]
+        , Ui.button
+            [ Element.alignRight
+            , Background.color Color.complement
+            ]
+            { onPress = Just HideStats
+            , label = Element.text "Back"
+            }
+        ]
+
+
+addDays : String -> String
+addDays value =
+    value ++ " Days"
