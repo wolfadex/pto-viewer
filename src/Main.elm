@@ -921,11 +921,12 @@ viewStats { allPto, currentYear, user } =
                     ( [], 0 )
     in
     Element.column
-        [ Element.width Element.fill
+        [ Element.width (Element.fill |> Element.maximum 800)
         , Element.height Element.fill
         , Background.color Color.white
         , Element.padding 16
         , Element.spacing 16
+        , Element.centerX
         ]
         [ Element.column
             [ Element.spacing 16
