@@ -111,14 +111,14 @@ function getPto() {
     .get()
     .then(function(querySnapshot) {
       const data = {};
-      console.log("carl", 0);
+
       querySnapshot.forEach(function(doc) {
         data[doc.id] = doc.data();
       });
       app.ports.setPto.send(data);
     })
     .catch(function(error) {
-      console.log("carl", 1, error);
+      // console.log("carl", 1, error);
       // TODO:
       // app.ports.ptoGetError.send(error);
     });

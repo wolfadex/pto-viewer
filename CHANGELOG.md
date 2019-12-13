@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - None
 
+## [1.3.0] - 2019-12-13
+### Added
+- Message about you falling below the "threshold" for PTO to encourage taking more. Current calculation is: if yourPTO + 3 < meanPTO then show message.
+
+### Changed
+- None
+
+### Removed
+- None
+
 ## [1.2.0] - 2019-12-12
 ### Added
 - Tos and Privacy Policy

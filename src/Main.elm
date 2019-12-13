@@ -1,6 +1,7 @@
 port module Main exposing
     ( main
     , Pto
+    , ptoBelowThreshhold
     )
 
 {-| An app for comparing PTO within a year, as a means for encouraging people to use their PTO. Especially when you're at a company that has unlimited PTO.
@@ -8,6 +9,7 @@ port module Main exposing
 @docs main
 
 @docs Pto
+@docs ptoBelowThreshhold
 
 -}
 
@@ -527,7 +529,7 @@ viewUnauthenticated =
 
 
 viewAuthenticated : AuthModel -> Element Msg
-viewAuthenticated { user, allPto, currentYear } =
+viewAuthenticated ({ user, allPto, currentYear } as authModel) =
     Element.column
         [ Element.centerX
         , Element.width (Element.fill |> Element.maximum 800)
@@ -617,7 +619,7 @@ viewAuthenticated { user, allPto, currentYear } =
                         (Element.text <| "Failed to load PTO: " ++ error)
                     ]
             )
-        , viewSettingsBar
+        , viewSettingsBar authModel
         ]
 
 
@@ -734,8 +736,12 @@ viewNameForm name =
             ]
 
 
-viewSettingsBar : Element Msg
-viewSettingsBar =
+viewSettingsBar : AuthModel -> Element Msg
+viewSettingsBar authModel =
+    let
+        ( totalPto, yourPto ) =
+            getJustPtoDays authModel
+    in
     Element.row
         [ Element.spacing 16
         , Element.padding 8
@@ -754,7 +760,21 @@ viewSettingsBar =
             , label = Element.text "PTO"
             }
         , Ui.button
-            []
+            [ Element.inFront <|
+                if ptoBelowThreshhold yourPto totalPto then
+                    Element.el
+                        [ Element.height (Element.px 14)
+                        , Element.width (Element.px 14)
+                        , Background.color (Element.rgb 1 0 0)
+                        , Border.rounded 7
+                        , Element.moveLeft 3.5
+                        , Element.moveUp 3.5
+                        ]
+                        Element.none
+
+                else
+                    Element.none
+            ]
             { onPress = Just ShowStats
             , label = Element.text "Stats"
             }
@@ -862,7 +882,7 @@ viewSettings { user, allPto } =
                 [ Ui.button
                     [ Background.color Color.complement ]
                     { onPress = Just HideSettings
-                    , label = Element.text "Cancel"
+                    , label = Element.text "Back"
                     }
                 , Ui.button
                     [ Background.color Color.secondary2
@@ -903,22 +923,10 @@ maxDaysInYear year =
 
 
 viewStats : AuthModel -> Element Msg
-viewStats { allPto, currentYear, user } =
+viewStats ({ allPto, currentYear, user } as authModel) =
     let
-        ( listOfDays, yourPto ) =
-            case allPto of
-                Success pto ->
-                    ( pto
-                        |> Dict.toList
-                        |> List.map (Tuple.second >> .years >> Dict.get currentYear >> Maybe.withDefault 0)
-                    , pto
-                        |> Dict.get user.id
-                        |> Maybe.map (.years >> Dict.get currentYear >> Maybe.withDefault 0)
-                        |> Maybe.withDefault 0
-                    )
-
-                _ ->
-                    ( [], 0 )
+        ( totalPto, yourPto ) =
+            getJustPtoDays authModel
     in
     Element.column
         [ Element.width (Element.fill |> Element.maximum 800)
@@ -947,10 +955,30 @@ viewStats { allPto, currentYear, user } =
                     |> addDays
                     |> Element.text
                 ]
+            , if ptoBelowThreshhold yourPto totalPto then
+                Element.paragraph
+                    [ Border.solid
+                    , Border.width 3
+                    , Border.color Color.primary
+                    , Element.padding 8
+                    ]
+                    [ Element.text "It looks like you're not taking enough PTO. It's a good idea to make sure you're taking enought time for yourself and keeping healthy! "
+                    , Element.newTabLink
+                        [ Font.color Color.linkBlue
+                        , Element.alignBottom
+                        , Font.size 14
+                        ]
+                        { url = "https://github.com/wolfadex/pto-viewer/blob/master/CHANGELOG.md"
+                        , label = Element.text "See Changelog for calculation"
+                        }
+                    ]
+
+              else
+                Element.none
             , Element.paragraph
                 []
                 [ label "Mean"
-                , (List.sum listOfDays // List.length listOfDays)
+                , (List.sum totalPto // List.length totalPto)
                     |> String.fromInt
                     |> addDays
                     |> Element.text
@@ -958,9 +986,9 @@ viewStats { allPto, currentYear, user } =
             , Element.paragraph
                 []
                 [ label "Median"
-                , listOfDays
+                , totalPto
                     |> List.sort
-                    |> List.drop (List.length listOfDays // 2)
+                    |> List.drop (List.length totalPto // 2)
                     |> List.head
                     |> Maybe.withDefault 0
                     |> String.fromInt
@@ -972,12 +1000,12 @@ viewStats { allPto, currentYear, user } =
                 [ label "Range"
                 , let
                     largest =
-                        listOfDays
+                        totalPto
                             |> List.maximum
                             |> Maybe.withDefault 0
 
                     smallest =
-                        listOfDays
+                        totalPto
                             |> List.minimum
                             |> Maybe.withDefault 0
                   in
@@ -1000,3 +1028,41 @@ viewStats { allPto, currentYear, user } =
 addDays : String -> String
 addDays value =
     value ++ " Days"
+
+
+getJustPtoDays : AuthModel -> ( List Int, Int )
+getJustPtoDays { allPto, user, currentYear } =
+    case allPto of
+        Success pto ->
+            ( pto
+                |> Dict.toList
+                |> List.map (Tuple.second >> .years >> Dict.get currentYear >> Maybe.withDefault 0)
+            , pto
+                |> Dict.get user.id
+                |> Maybe.map (.years >> Dict.get currentYear >> Maybe.withDefault 0)
+                |> Maybe.withDefault 0
+            )
+
+        _ ->
+            ( [], 0 )
+
+
+{-| Really not sure what this calculation should be.
+Testing this right now till we find a better solution.
+
+Current calculation:
+
+    if selfPto + 3 < meanPto then
+        Just showMessageToTakeMorePTO
+
+    else
+        Nothing
+
+-}
+ptoBelowThreshhold : Int -> List Int -> Bool
+ptoBelowThreshhold selfPto totalPto =
+    let
+        mean =
+            List.sum totalPto // List.length totalPto
+    in
+    selfPto + 3 < mean
