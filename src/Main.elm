@@ -23,6 +23,8 @@ import Element.Input as Input
 import Element.Keyed as Keyed
 import Element.Region as Region
 import Html
+import Html.Attributes as Attributes
+import Html.Events as Events
 import Json.Decode exposing (Decoder)
 import Json.Encode exposing (Value)
 import Ui
@@ -58,6 +60,8 @@ type alias AuthModel =
     , currentYear : Year
     , showSettings : Bool
     , showStats : Bool
+    , selectedYear : Year
+    , yearOptions : List Year
     }
 
 
@@ -106,6 +110,11 @@ type alias Pto =
 
 type alias Year =
     Int
+
+
+firstYear : Year
+firstYear =
+    2019
 
 
 type alias Day =
@@ -169,6 +178,7 @@ type Msg
     | RefreshData
     | ShowStats
     | HideStats
+    | YearSelected Year
 
 
 
@@ -276,6 +286,8 @@ updateUnauthenticated msg currentYear model =
                 , currentYear = currentYear
                 , showSettings = False
                 , showStats = False
+                , selectedYear = currentYear
+                , yearOptions = List.range firstYear currentYear
                 }
             , getPto ()
             )
@@ -288,6 +300,12 @@ updateUnauthenticated msg currentYear model =
 updateAuthenticated : Msg -> AuthModel -> Model -> ( Model, Cmd Msg )
 updateAuthenticated msg authModel model =
     case msg of
+        -- Dropdowns
+        YearSelected year ->
+            ( Authenticated { authModel  | selectedYear = year }
+            , Cmd.none
+            )
+
         -- Auth
         LoggedOut ->
             ( Unauthenticated authModel.currentYear, Cmd.none )
@@ -353,7 +371,7 @@ updateAuthenticated msg authModel model =
         SetAddPtoDays days ->
             let
                 maxDays =
-                    maxDaysInYear authModel.currentYear
+                    maxDaysInYear authModel.selectedYear
             in
             ( Authenticated { authModel | addPto = Just (days |> min maxDays |> max -maxDays) }
             , Cmd.none
@@ -395,20 +413,20 @@ updateAuthenticated msg authModel model =
 
 
 encodeMyPto : AuthModel -> Int -> Maybe Value
-encodeMyPto { user, allPto, currentYear } days =
+encodeMyPto { user, allPto, selectedYear } days =
     case allPto of
         Success pto ->
             Just <|
                 Json.Encode.object <|
                     let
                         maxDays =
-                            maxDaysInYear currentYear
+                            maxDaysInYear selectedYear
                     in
                     case Dict.get user.id pto of
                         Just { years } ->
                             years
                                 |> Dict.update
-                                    currentYear
+                                    selectedYear
                                     (\d ->
                                         Maybe.withDefault 0 d
                                             + days
@@ -423,7 +441,7 @@ encodeMyPto { user, allPto, currentYear } days =
                                     )
 
                         Nothing ->
-                            [ ( String.fromInt currentYear, Json.Encode.object [ ( "days", Json.Encode.int (days |> max 0 |> min maxDays) ) ] ) ]
+                            [ ( String.fromInt selectedYear, Json.Encode.object [ ( "days", Json.Encode.int (days |> max 0 |> min maxDays) ) ] ) ]
 
         _ ->
             Nothing
@@ -529,7 +547,7 @@ viewUnauthenticated =
 
 
 viewAuthenticated : AuthModel -> Element Msg
-viewAuthenticated ({ user, allPto, currentYear } as authModel) =
+viewAuthenticated ({ user, allPto, selectedYear, yearOptions } as authModel) =
     Element.column
         [ Element.centerX
         , Element.width (Element.fill |> Element.maximum 800)
@@ -570,7 +588,29 @@ viewAuthenticated ({ user, allPto, currentYear } as authModel) =
                                 ]
                                 [ Element.row
                                     [ Element.width Element.fill ]
-                                    [ Element.text ("Year: " ++ String.fromInt currentYear)
+                                    [ Element.row
+                                        []
+                                        [ Element.text "Year: "
+                                        , Element.html <|
+                                            Html.select
+                                                [ Events.onInput (String.toInt >> Maybe.withDefault selectedYear >> YearSelected)
+                                                , Attributes.style "font-size" "20px"
+                                                ]
+                                                (List.map
+                                                    (\option ->
+                                                        Html.option
+                                                            [ Attributes.value (String.fromInt option)
+                                                            , Attributes.selected (option == selectedYear)
+                                                            ]
+                                                            [ Html.text (String.fromInt option) ]
+                                                    )
+                                                    yearOptions
+                                                )
+                                        --, Dropdown.view
+                                        --    selectedYearConfig
+                                        --    selectedYearDropdown
+                                        --    yearOptions
+                                        ]
                                     , Ui.button
                                         [ Element.alignRight ]
                                         { onPress = Just RefreshData
@@ -583,7 +623,7 @@ viewAuthenticated ({ user, allPto, currentYear } as authModel) =
                                     (let
                                         ( names, days ) =
                                             listPto
-                                                |> List.map (viewPto currentYear user.id)
+                                                |> List.map (viewPto selectedYear user.id)
                                                 |> List.unzip
                                      in
                                      [ Keyed.column
@@ -653,7 +693,7 @@ tableHeader title =
 -}
 
 
-viewPto : Int -> Id -> ( Id, Pto ) -> ( ( String, Element Msg ), ( String, Element Msg ) )
+viewPto : Year -> Id -> ( Id, Pto ) -> ( ( String, Element Msg ), ( String, Element Msg ) )
 viewPto year selfId ( ptoId, { name, years } ) =
     ( ( "name-" ++ ptoId
       , Element.el
@@ -923,7 +963,7 @@ maxDaysInYear year =
 
 
 viewStats : AuthModel -> Element Msg
-viewStats ({ allPto, currentYear, user } as authModel) =
+viewStats (authModel) =
     let
         ( totalPto, yourPto ) =
             getJustPtoDays authModel
@@ -1031,15 +1071,15 @@ addDays value =
 
 
 getJustPtoDays : AuthModel -> ( List Int, Int )
-getJustPtoDays { allPto, user, currentYear } =
+getJustPtoDays { allPto, user, selectedYear } =
     case allPto of
         Success pto ->
             ( pto
                 |> Dict.toList
-                |> List.map (Tuple.second >> .years >> Dict.get currentYear >> Maybe.withDefault 0)
+                |> List.map (Tuple.second >> .years >> Dict.get selectedYear >> Maybe.withDefault 0)
             , pto
                 |> Dict.get user.id
-                |> Maybe.map (.years >> Dict.get currentYear >> Maybe.withDefault 0)
+                |> Maybe.map (.years >> Dict.get selectedYear >> Maybe.withDefault 0)
                 |> Maybe.withDefault 0
             )
 
